@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ruta Óptima TSP - Hill Climbing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #74ebd5 0%, #acb6e5 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 20px 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .resultado {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #map {
+            height: 1000px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 30px;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <h1>Optimizar Ruta de Ciudadess</h1>
+    <button onclick="obtenerRuta()">Generar Ruta Óptima</button>
+
+    <div class="spinner" id="spinner"></div>
+
+    <div id="resultado" class="resultado" style="display:none;"></div>
+
+    <div id="map" style="display:none;"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let mapa = null;
+        let rutaLinea = null;
+        let marcadores = [];
+
+        function obtenerRuta() {
+            document.getElementById('spinner').style.display = 'block';
+            document.getElementById('resultado').style.display = 'none';
+            document.getElementById('map').style.display = 'none';
+
+            fetch('/ruta-optima')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('spinner').style.display = 'none';
+                    const resultado = document.getElementById('resultado');
+                    resultado.style.display = 'block';
+                    resultado.innerHTML = `
+                        <h2>Ruta Óptima:</h2>
+                        <p>${data.ruta.join(' ➔ ')}</p>
+                        <h3>Distancia Total: ${data.distancia_total.toFixed(2)}</h3>
+                    `;
+
+                    // Mostrar mapa
+                    document.getElementById('map').style.display = 'block';
+                    if (mapa === null) {
+                        mapa = L.map('map').setView([50.5, 100], 5);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 18,
+                        }).addTo(mapa);
+                    }
+
+                    // Limpiar la ruta anterior
+                    if (rutaLinea !== null) {
+                        mapa.removeLayer(rutaLinea);
+                    }
+
+                    // Limpiar marcadores anteriores
+                    marcadores.forEach(marcador => mapa.removeLayer(marcador));
+                    marcadores = [];
+
+                    // Dibujar nueva ruta
+                    const coordenadas = data.coordenadas.map(c => [c[0], c[1]]);
+                    coordenadas.push(coordenadas[0]); // Para cerrar el ciclo
+
+                    rutaLinea = L.polyline(coordenadas, {color: 'blue'}).addTo(mapa);
+
+                    // Agregar marcadores con nombres
+                    data.ruta.forEach((nombreCiudad, index) => {
+                        const [lat, lon] = data.coordenadas[index];
+                        const marcador = L.marker([lat, lon])
+                            .addTo(mapa)
+                            .bindPopup(`<b>${nombreCiudad}</b>`);
+                        marcadores.push(marcador);
+                    });
+
+                    // Ajustar el mapa para mostrar toda la ruta
+                    mapa.fitBounds(rutaLinea.getBounds());
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+    </script>
+</body>
+</html>
